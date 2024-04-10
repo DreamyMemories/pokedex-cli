@@ -11,6 +11,10 @@ import (
 func main() {
 	scanner := bufio.NewScanner(os.Stdin)
 	commands := functions.GetCommands()
+	config := functions.Config{
+		Next:     "",
+		Previous: "",
+	}
 	fmt.Println("Welcome to the Pokedex!")
 	fmt.Print("Pokedex > ")
 	for scanner.Scan() {
@@ -19,7 +23,7 @@ func main() {
 			fmt.Println("Command not found. Type 'help' for a list of commands.")
 
 		} else {
-			commands[scanner.Text()].Callback()
+			commands[scanner.Text()].Callback(&config)
 		}
 		fmt.Print("Pokedex > ")
 	}

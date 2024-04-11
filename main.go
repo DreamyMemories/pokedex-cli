@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/DreamyMemories/pokedex-cli/functions"
+	"github.com/DreamyMemories/pokedex-cli/pokecache"
 )
 
 func main() {
@@ -15,6 +17,7 @@ func main() {
 		Next:     "",
 		Previous: "",
 	}
+	cache := *pokecache.NewCache(5 * time.Minute)
 	fmt.Println("Welcome to the Pokedex!")
 	fmt.Print("Pokedex > ")
 	for scanner.Scan() {
@@ -23,7 +26,7 @@ func main() {
 			fmt.Println("Command not found. Type 'help' for a list of commands.")
 
 		} else {
-			commands[scanner.Text()].Callback(&config)
+			commands[scanner.Text()].Callback(&config, &cache)
 		}
 		fmt.Print("Pokedex > ")
 	}

@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/DreamyMemories/pokedex-cli/pokecache"
 	"github.com/DreamyMemories/pokedex-cli/types"
@@ -14,7 +15,7 @@ import (
 type cliCommand struct {
 	name        string
 	description string
-	Callback    func(configPtr *Config, cache *pokecache.Cache) error
+	Callback    func(configPtr *Config, cache *pokecache.Cache, arg string) error
 }
 
 type Config struct {
@@ -44,10 +45,26 @@ func GetCommands() map[string]cliCommand {
 			description: "Displays next 20 locations back",
 			Callback:    commandMapb,
 		},
+		"explore": {
+			name:        "explore",
+			description: "Explores a specific area and returning a list of pokemons, explore <area-name>",
+			Callback:    commandExplore,
+		},
 	}
 }
 
-func commandHelp(configPtr *Config, cache *pokecache.Cache) error {
+func GetNameAndArg(input string) (commandName string, argument string) {
+	args := strings.Fields(input)
+	command := args[0]
+	var commandArg string
+	if len(args) > 1 {
+		commandArg = args[1]
+	}
+
+	return command, commandArg
+}
+
+func commandHelp(configPtr *Config, cache *pokecache.Cache, argument string) error {
 	fmt.Println("Here are the available commands:")
 	commands := GetCommands()
 	for _, command := range commands {
@@ -57,33 +74,72 @@ func commandHelp(configPtr *Config, cache *pokecache.Cache) error {
 	return nil
 }
 
-func commandExit(configPtr *Config, cache *pokecache.Cache) error {
+func commandExit(configPtr *Config, cache *pokecache.Cache, argument string) error {
 	fmt.Println("Goodbye!")
 	os.Exit(0)
 	return nil
 }
 
-func displayItems(response types.ApiResponse) {
-	for _, location := range response.Results {
-		fmt.Println(location.Name)
+func commandExplore(configPtr *Config, cache *pokecache.Cache, argument string) error {
+	data, cached := cache.Get(argument)
+	if cached {
+		switch d := data.(type) {
+		case types.EncounterApiResponse:
+			displayItems(d)
+		}
+	} else {
+
+		response, err := http.Get("https://pokeapi.co/api/v2/location-area/" + argument)
+
+		if err != nil {
+			return fmt.Errorf("HTTP request failed: %v", err)
+		}
+
+		body, _ := io.ReadAll(response.Body)
+		if response.StatusCode != http.StatusOK {
+			return fmt.Errorf("HTTP request unsuccessful: %v", response.StatusCode)
+		}
+
+		var apiResponse types.EncounterApiResponse
+
+		if err := json.Unmarshal(body, &apiResponse); err != nil {
+			return fmt.Errorf("Error in parsing json: %v", err)
+		}
+		cache.Add(argument, apiResponse)
+		displayItems(apiResponse)
 	}
+	return nil
 }
 
-func commandMap(configPtr *Config, cache *pokecache.Cache) error {
+func displayItems(response interface{}) {
+	switch r := response.(type) {
+	case types.ApiResponse:
+		for _, location := range r.Results {
+			fmt.Println(location.Name)
+		}
+	case types.EncounterApiResponse:
+		for _, pokemon := range r.PokemonEncounters {
+			fmt.Println(pokemon.Pokemon.Name)
+		}
+	}
+
+}
+
+func commandMap(configPtr *Config, cache *pokecache.Cache, argument string) error {
 	if configPtr.Next == "" {
-		response, err := http.Get("https://pokeapi.co/api/v2/location-area")
-		if err != nil {
-			fmt.Println(err)
+		response, _ := http.Get("https://pokeapi.co/api/v2/location-area")
+		if response.StatusCode != http.StatusOK {
+			return fmt.Errorf("bad HTTP Status Code: %v", response.StatusCode)
 		}
 		body, err := io.ReadAll(response.Body)
 		if err != nil {
-			fmt.Println(err)
+			return fmt.Errorf("http request unsuccessful body: %v", err)
 		}
 		var apiResponse types.ApiResponse
 
 		// Unmarshal json
 		if err := json.Unmarshal([]byte(body), &apiResponse); err != nil {
-			fmt.Println("Error in parsing json: %v", err)
+			return fmt.Errorf("error in parsing json: %v", err)
 		}
 
 		// Set next and back in config
@@ -97,9 +153,13 @@ func commandMap(configPtr *Config, cache *pokecache.Cache) error {
 		// Get data from cache
 		data, cached := cache.Get(configPtr.Next)
 		if cached {
-			displayItems(data)
-			configPtr.Previous = data.Previous
-			configPtr.Next = data.Next
+			switch v := data.(type) {
+			case types.ApiResponse:
+				displayItems(v)
+				configPtr.Previous = v.Previous
+				configPtr.Next = v.Next
+			}
+
 		} else {
 			response, err := http.Get(configPtr.Next)
 			if err != nil {
@@ -126,33 +186,35 @@ func commandMap(configPtr *Config, cache *pokecache.Cache) error {
 	}
 }
 
-func commandMapb(configPtr *Config, cache *pokecache.Cache) error {
+func commandMapb(configPtr *Config, cache *pokecache.Cache, argument string) error {
 	if configPtr.Previous == "" {
 		fmt.Println("Error: no previous request, please use map first")
 	} else {
 		// Check cache
-		fmt.Printf("Getting cache %v", configPtr.Previous)
 		data, cached := cache.Get(configPtr.Previous)
 		if cached {
-			displayItems(data)
-			configPtr.Previous = data.Previous
-			configPtr.Next = data.Next
+			switch v := data.(type) {
+			case types.ApiResponse:
+				displayItems(v)
+				configPtr.Previous = v.Previous
+				configPtr.Next = v.Next
+			}
 		} else {
-			response, err := http.Get(configPtr.Previous)
+			response, _ := http.Get(configPtr.Previous)
 
-			if err != nil {
-				return err
+			if response.StatusCode != http.StatusOK {
+				return fmt.Errorf("Bad HTTP Response Status Code: %v", response.StatusCode)
 			}
 
 			body, err := io.ReadAll(response.Body)
 			if err != nil {
-				fmt.Println(err)
+				return fmt.Errorf("Bad HTTP body: %v", body)
 			}
 			var apiResponse types.ApiResponse
 
 			// Unmarshal json
 			if err := json.Unmarshal([]byte(body), &apiResponse); err != nil {
-				fmt.Println("Error in parsing json: %v", err)
+				return fmt.Errorf("Error in parsing json: %v", err)
 			}
 
 			// Set next and back in config

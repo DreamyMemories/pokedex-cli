@@ -21,12 +21,13 @@ func main() {
 	fmt.Println("Welcome to the Pokedex!")
 	fmt.Print("Pokedex > ")
 	for scanner.Scan() {
-		_, exist := commands[scanner.Text()] // Map property, second value checks
+		command, arg := functions.GetNameAndArg(scanner.Text())
+		_, exist := commands[command] // Map property, second value checks
 		if !exist {
 			fmt.Println("Command not found. Type 'help' for a list of commands.")
 
 		} else {
-			commands[scanner.Text()].Callback(&config, &cache)
+			commands[command].Callback(&config, &cache, arg)
 		}
 		fmt.Print("Pokedex > ")
 	}

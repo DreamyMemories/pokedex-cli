@@ -5,13 +5,11 @@ import (
 	"log"
 	"sync"
 	"time"
-
-	"github.com/DreamyMemories/pokedex-cli/types"
 )
 
 type cacheEntry struct {
 	createdAt time.Time
-	val       types.ApiResponse
+	val       interface{}
 }
 
 type Cache struct {
@@ -28,7 +26,7 @@ func NewCache(interval time.Duration) *Cache {
 	return newCache
 }
 
-func (cache *Cache) Add(key string, val types.ApiResponse) {
+func (cache *Cache) Add(key string, val interface{}) {
 	cache.Lock()
 	defer cache.Unlock() // Wait function to finish only unlock
 
@@ -39,19 +37,15 @@ func (cache *Cache) Add(key string, val types.ApiResponse) {
 	cache.Data[key] = entry
 }
 
-func (cache *Cache) Get(key string) (types.ApiResponse, bool) {
+func (cache *Cache) Get(key string) (interface{}, bool) {
 	cache.Lock()
 	defer cache.Unlock()
 
 	if data, exist := cache.Data[key]; exist {
 		return data.val, exist
 	}
-	temp := types.ApiResponse{
-		Next:     "",
-		Previous: "",
-		Results:  make([]types.LocationArea, 0),
-	}
-	return temp, false
+
+	return nil, false
 }
 
 func (cache *Cache) reapLoop(t time.Duration) {

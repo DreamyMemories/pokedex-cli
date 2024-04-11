@@ -118,8 +118,9 @@ func displayItems(response interface{}) {
 			fmt.Println(location.Name)
 		}
 	case types.EncounterApiResponse:
+		fmt.Println("Found Pokemon: ")
 		for _, pokemon := range r.PokemonEncounters {
-			fmt.Println(pokemon.Pokemon.Name)
+			fmt.Println(" -", pokemon.Pokemon.Name)
 		}
 	}
 

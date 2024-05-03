@@ -8,6 +8,7 @@ import (
 
 	"github.com/DreamyMemories/pokedex-cli/functions"
 	"github.com/DreamyMemories/pokedex-cli/pokecache"
+	"github.com/DreamyMemories/pokedex-cli/types"
 )
 
 func main() {
@@ -18,6 +19,7 @@ func main() {
 		Previous: "",
 	}
 	cache := *pokecache.NewCache(5 * time.Minute)
+	pokemonTeam := make(map[string]types.Pokemon)
 	fmt.Println("Welcome to the Pokedex!")
 	fmt.Print("Pokedex > ")
 	for scanner.Scan() {
@@ -27,7 +29,7 @@ func main() {
 			fmt.Println("Command not found. Type 'help' for a list of commands.")
 
 		} else {
-			commands[command].Callback(&config, &cache, arg)
+			commands[command].Callback(&config, &cache, arg, pokemonTeam)
 		}
 		fmt.Print("Pokedex > ")
 	}

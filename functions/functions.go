@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
+	"math/rand"
 	"net/http"
 	"os"
 	"strings"
@@ -15,7 +17,7 @@ import (
 type cliCommand struct {
 	name        string
 	description string
-	Callback    func(configPtr *Config, cache *pokecache.Cache, arg string) error
+	Callback    func(configPtr *Config, cache *pokecache.Cache, arg string, pokemonTeam map[string]types.Pokemon) error
 }
 
 type Config struct {
@@ -50,6 +52,11 @@ func GetCommands() map[string]cliCommand {
 			description: "Explores a specific area and returning a list of pokemons, explore <area-name>",
 			Callback:    commandExplore,
 		},
+		"catch": {
+			name:        "catch",
+			description: "Catches a pokemon, catch <pokemon-name>",
+			Callback:    commandCatch,
+		},
 	}
 }
 
@@ -64,7 +71,7 @@ func GetNameAndArg(input string) (commandName string, argument string) {
 	return command, commandArg
 }
 
-func commandHelp(configPtr *Config, cache *pokecache.Cache, argument string) error {
+func commandHelp(configPtr *Config, cache *pokecache.Cache, argument string, pokemonTeam map[string]types.Pokemon) error {
 	fmt.Println("Here are the available commands:")
 	commands := GetCommands()
 	for _, command := range commands {
@@ -74,13 +81,13 @@ func commandHelp(configPtr *Config, cache *pokecache.Cache, argument string) err
 	return nil
 }
 
-func commandExit(configPtr *Config, cache *pokecache.Cache, argument string) error {
+func commandExit(configPtr *Config, cache *pokecache.Cache, argument string, pokemonTeam map[string]types.Pokemon) error {
 	fmt.Println("Goodbye!")
 	os.Exit(0)
 	return nil
 }
 
-func commandExplore(configPtr *Config, cache *pokecache.Cache, argument string) error {
+func commandExplore(configPtr *Config, cache *pokecache.Cache, argument string, pokemonTeam map[string]types.Pokemon) error {
 	data, cached := cache.Get(argument)
 	if cached {
 		switch d := data.(type) {
@@ -126,7 +133,7 @@ func displayItems(response interface{}) {
 
 }
 
-func commandMap(configPtr *Config, cache *pokecache.Cache, argument string) error {
+func commandMap(configPtr *Config, cache *pokecache.Cache, argument string, pokemonTeam map[string]types.Pokemon) error {
 	if configPtr.Next == "" {
 		response, _ := http.Get("https://pokeapi.co/api/v2/location-area")
 		if response.StatusCode != http.StatusOK {
@@ -187,7 +194,7 @@ func commandMap(configPtr *Config, cache *pokecache.Cache, argument string) erro
 	}
 }
 
-func commandMapb(configPtr *Config, cache *pokecache.Cache, argument string) error {
+func commandMapb(configPtr *Config, cache *pokecache.Cache, argument string, pokemonTeam map[string]types.Pokemon) error {
 	if configPtr.Previous == "" {
 		fmt.Println("Error: no previous request, please use map first")
 	} else {
@@ -223,6 +230,33 @@ func commandMapb(configPtr *Config, cache *pokecache.Cache, argument string) err
 			configPtr.Previous = apiResponse.Previous
 			displayItems(apiResponse)
 		}
+	}
+	return nil
+}
+
+func commandCatch(configPtr *Config, cache *pokecache.Cache, argument string, pokemonTeam map[string]types.Pokemon) error {
+	response, err := http.Get("https://pokeapi.co/api/v2/pokemon/" + argument)
+
+	if err != nil {
+		return fmt.Errorf("HTTP request failed: %v", err)
+	}
+
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return fmt.Errorf("HTTP request unsuccessful body: %v", err)
+	}
+	var apiResponse types.Pokemon
+	if err := json.Unmarshal(body, &apiResponse); err != nil {
+		return fmt.Errorf("Error in parsing json: %v", err)
+	}
+	// Determine random chance based off of base experience
+	catchChance := math.Max(0.1, 1.0-(float64(apiResponse.BaseExperience)/700.0))
+	roll := rand.Float64()
+	if roll < catchChance {
+		fmt.Println("You caught", apiResponse.Name)
+		pokemonTeam[apiResponse.Name] = apiResponse
+	} else {
+		fmt.Println("The pokemon escaped from the pokeball!")
 	}
 	return nil
 }

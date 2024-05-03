@@ -2,6 +2,17 @@
 
 Welcome to Pokedex-CLI, a command-line interface for exploring the vast world of Pokémon! Written in Go, this tool allows users to explore Pokémon data by querying different locations within the Pokémon universe.
 
+## Roadmap
+
+- [x] Catch Pokémon based off pokemon name
+    - [x] Use endpoint for information on pokemon
+    - [x] Use random number generator and base experience to determine if pokemon is caught
+    - [x] Add caught pokemon to user's collection
+
+- [] Inspect caught pokemon
+    - [] Use endpoint for information on pokemon
+    - [] Display information on caught pokemon
+
 ## Features
 
 - `explore <location>`: Retrieve a list of Pokémon found in the specified location.
